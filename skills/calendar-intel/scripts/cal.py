@@ -18,7 +18,10 @@ TZ = ZoneInfo(os.environ.get("CAL_TZ", "America/Los_Angeles"))
 def load_ics() -> str:
     src = os.environ.get("CAL_ICS_URL", "")
     if not src:  # A3 deployment: the local broker holds the secret URL
-        src = os.environ.get("A3_BROKER", "http://127.0.0.1:8090").rstrip("/") + "/cal/ics"
+        broker = os.environ.get("A3_BROKER", "")
+        if not broker:
+            sys.exit("set CAL_ICS_URL (secret iCal address or .ics path)")
+        src = broker.rstrip("/") + "/cal/ics"
     if src.startswith(("http://", "https://")):
         with urllib.request.urlopen(src, timeout=30) as r:
             return r.read().decode("utf-8", errors="replace")
@@ -51,7 +54,7 @@ SUSPICIOUS = re.compile(r"(ignore (all |any |the )?(previous|prior|above)|system
 
 
 def fmt(ev: dict) -> dict:
-    desc = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f​-‏‪-‮⁠﻿]", "", ev["description"])[:200]
+    desc = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2060\ufeff]", "", ev["description"])[:200]
     out = {"title": ev["title"], "start": ev["start"].isoformat(timespec="minutes"),
            "end": ev["end"].isoformat(timespec="minutes"), "all_day": ev["all_day"], "location": ev["location"],
            "description": f"<<<UNTRUSTED_CALENDAR_TEXT {desc} END>>>" if desc else "",
